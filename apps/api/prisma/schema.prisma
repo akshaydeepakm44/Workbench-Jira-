@@ -539,6 +539,7 @@ model ProjectDecision {
   summary     String
   rationale   String?
   status      String   @default("APPROVED") // "PROPOSED" | "APPROVED" | "SUPERSEDED" | "REJECTED"
+  visibility  String   @default("TEAM") // "MYSELF" | "TEAM" | "CORE"
   decidedById String
   decidedBy   User     @relation("DecidedBy", fields: [decidedById], references: [id])
   meetingId   String?

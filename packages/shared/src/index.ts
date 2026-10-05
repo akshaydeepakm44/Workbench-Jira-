@@ -920,6 +920,8 @@ export interface BulkOperationResponseDto {
   results: BulkItemResultDto[];
 }
 
+export type DecisionVisibility = 'MYSELF' | 'TEAM' | 'CORE';
+
 export interface ProjectDecisionDto {
   id: string;
   projectId: string;
@@ -928,6 +930,7 @@ export interface ProjectDecisionDto {
   summary: string;
   rationale?: string | null;
   status: string;
+  visibility?: 'MYSELF' | 'TEAM' | 'CORE' | string;
   decidedById: string;
   decidedByName?: string;
   meetingId?: string | null;
@@ -944,6 +947,7 @@ export interface CreateProjectDecisionDto {
   summary: string;
   rationale?: string;
   status?: string;
+  visibility?: 'MYSELF' | 'TEAM' | 'CORE' | string;
   meetingId?: string;
   taskId?: string;
 }

@@ -31,6 +31,23 @@ export class DecisionsService {
     return project;
   }
 
+  private async checkIsIntern(userId: string): Promise<boolean> {
+    const dbUser = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, fullName: true, employeeId: true },
+    });
+    if (!dbUser) return false;
+    const email = dbUser.email?.toLowerCase() || '';
+    const name = dbUser.fullName?.toLowerCase() || '';
+    const empId = dbUser.employeeId?.toUpperCase() || '';
+    return (
+      email.includes('intern') ||
+      name.includes('intern') ||
+      empId.startsWith('INT') ||
+      empId.includes('INTERN')
+    );
+  }
+
   async createDecision(
     dto: CreateProjectDecisionDto,
     user: { id: string; roleCode: RoleCode },
@@ -43,6 +60,9 @@ export class DecisionsService {
       throw new ForbiddenException('Only Leads and Managers can record project decisions');
     }
 
+    const rawVis = (dto.visibility || 'TEAM').toUpperCase();
+    const visibility = ['MYSELF', 'TEAM', 'CORE'].includes(rawVis) ? rawVis : 'TEAM';
+
     const decision = await this.prisma.projectDecision.create({
       data: {
         projectId: dto.projectId,
@@ -50,6 +70,7 @@ export class DecisionsService {
         summary: dto.summary,
         rationale: dto.rationale,
         status: dto.status || 'APPROVED',
+        visibility,
         decidedById: user.id,
         meetingId: dto.meetingId,
         taskId: dto.taskId,
@@ -79,6 +100,7 @@ export class DecisionsService {
         projectId: dto.projectId,
         title: dto.title,
         status: decision.status,
+        visibility: decision.visibility,
       },
       ipAddress,
     });
@@ -91,6 +113,7 @@ export class DecisionsService {
       summary: decision.summary,
       rationale: decision.rationale,
       status: decision.status,
+      visibility: decision.visibility,
       decidedById: decision.decidedById,
       decidedByName: decision.decidedBy.fullName,
       meetingId: decision.meetingId,
@@ -107,6 +130,7 @@ export class DecisionsService {
     user: { id: string; roleCode: RoleCode },
   ): Promise<ProjectDecisionDto[]> {
     const project = await this.verifyProjectAccess(projectId, user);
+    const isIntern = await this.checkIsIntern(user.id);
 
     const decisions = await this.prisma.projectDecision.findMany({
       where: { projectId },
@@ -118,7 +142,22 @@ export class DecisionsService {
       orderBy: { createdAt: 'desc' },
     });
 
-    return decisions.map((d) => ({
+    const visibleDecisions = decisions.filter((d) => {
+      const vis = (d.visibility || 'TEAM').toUpperCase();
+      // 1. MYSELF: only visible to the author himself
+      if (vis === 'MYSELF') {
+        return d.decidedById === user.id;
+      }
+      // 2. CORE: visible to employees, hr, leads, managers, but NOT interns / external
+      if (vis === 'CORE') {
+        if (isIntern) return false;
+        return true;
+      }
+      // 3. TEAM: visible to everyone
+      return true;
+    });
+
+    return visibleDecisions.map((d) => ({
       id: d.id,
       projectId: d.projectId,
       projectName: d.project.name,
@@ -126,6 +165,7 @@ export class DecisionsService {
       summary: d.summary,
       rationale: d.rationale,
       status: d.status,
+      visibility: d.visibility,
       decidedById: d.decidedById,
       decidedByName: d.decidedBy.fullName,
       meetingId: d.meetingId,
@@ -149,6 +189,15 @@ export class DecisionsService {
     if (!d) throw new NotFoundException(`Decision ${id} not found`);
     await this.verifyProjectAccess(d.projectId, user);
 
+    const isIntern = await this.checkIsIntern(user.id);
+    const vis = (d.visibility || 'TEAM').toUpperCase();
+    if (vis === 'MYSELF' && d.decidedById !== user.id) {
+      throw new ForbiddenException('This decision is only visible to its author.');
+    }
+    if (vis === 'CORE' && isIntern) {
+      throw new ForbiddenException('This decision is restricted to core personnel.');
+    }
+
     return {
       id: d.id,
       projectId: d.projectId,
@@ -157,6 +206,7 @@ export class DecisionsService {
       summary: d.summary,
       rationale: d.rationale,
       status: d.status,
+      visibility: d.visibility,
       decidedById: d.decidedById,
       decidedByName: d.decidedBy.fullName,
       meetingId: d.meetingId,
