@@ -483,6 +483,7 @@ export class UsersService {
 
     const appUrl = process.env.APP_URL || 'http://localhost:5174';
     const inviteLink = `${appUrl}/accept-invitation?token=${rawToken}`;
+    const localLink = `http://localhost:5174/accept-invitation?token=${rawToken}`;
     let emailStatus: 'SENT' | 'PENDING_ENVIRONMENT' = 'PENDING_ENVIRONMENT';
     let emailPreviewUrl: string | null = null;
 
@@ -506,14 +507,19 @@ export class UsersService {
               </a>
             </div>
             <p style="color: #64748b; font-size: 13px; line-height: 1.5;">
-              Or copy and paste this verification URL into your browser:<br/>
+              Primary Verification Link:<br/>
               <a href="${inviteLink}" style="color: #4f46e5; word-break: break-all;">${inviteLink}</a>
             </p>
+            ${!appUrl.includes('localhost') ? `
+            <p style="color: #64748b; font-size: 12px; line-height: 1.4; margin-top: 12px; padding: 10px; background-color: #f8fafc; border-radius: 6px; border: 1px dashed #cbd5e1;">
+              <strong>Testing on this local computer?</strong> You can also access via your local dev URL:<br/>
+              <a href="${localLink}" style="color: #0284c7; word-break: break-all;">${localLink}</a>
+            </p>` : ''}
             <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
             <p style="color: #94a3b8; font-size: 12px; margin: 0;">This invitation is valid for 72 hours. If you did not expect this invitation, you can ignore this email.</p>
           </div>
         `,
-        text: `Hello ${user.fullName},\n\nYou have been invited to join WorkDesk as ${role.name}${project ? ` on ${project.name}` : ''}.\n\nClick the link below to accept and verify your invitation:\n${inviteLink}\n\nThis invitation is valid for 72 hours.`,
+        text: `Hello ${user.fullName},\n\nYou have been invited to join WorkDesk as ${role.name}${project ? ` on ${project.name}` : ''}.\n\nClick the link below to accept and verify your invitation:\n${inviteLink}\n\nLocal development link: ${localLink}\n\nThis invitation is valid for 72 hours.`,
         templateName: 'USER_INVITATION',
       });
       emailStatus = emailResult.success ? 'SENT' : 'PENDING_ENVIRONMENT';
@@ -589,6 +595,7 @@ export class UsersService {
 
     const appUrl = process.env.APP_URL || 'http://localhost:5174';
     const inviteLink = `${appUrl}/accept-invitation?token=${rawToken}`;
+    const localLink = `http://localhost:5174/accept-invitation?token=${rawToken}`;
     let emailStatus: 'SENT' | 'PENDING_ENVIRONMENT' = 'PENDING_ENVIRONMENT';
     let emailPreviewUrl: string | null = null;
 
@@ -612,14 +619,19 @@ export class UsersService {
               </a>
             </div>
             <p style="color: #64748b; font-size: 13px; line-height: 1.5;">
-              Or copy and paste this verification URL into your browser:<br/>
+              Primary Verification Link:<br/>
               <a href="${inviteLink}" style="color: #4f46e5; word-break: break-all;">${inviteLink}</a>
             </p>
+            ${!appUrl.includes('localhost') ? `
+            <p style="color: #64748b; font-size: 12px; line-height: 1.4; margin-top: 12px; padding: 10px; background-color: #f8fafc; border-radius: 6px; border: 1px dashed #cbd5e1;">
+              <strong>Testing on this local computer?</strong> You can also access via your local dev URL:<br/>
+              <a href="${localLink}" style="color: #0284c7; word-break: break-all;">${localLink}</a>
+            </p>` : ''}
             <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
             <p style="color: #94a3b8; font-size: 12px; margin: 0;">This invitation is valid for 72 hours.</p>
           </div>
         `,
-        text: `Hello ${user.fullName},\n\nHere is your updated invitation link to join WorkDesk:\n${inviteLink}\n\nThis invitation is valid for 72 hours.`,
+        text: `Hello ${user.fullName},\n\nHere is your updated invitation link to join WorkDesk:\n${inviteLink}\n\nLocal development link: ${localLink}\n\nThis invitation is valid for 72 hours.`,
         templateName: 'USER_INVITATION_RESENT',
       });
       emailStatus = emailResult.success ? 'SENT' : 'PENDING_ENVIRONMENT';
@@ -756,8 +768,68 @@ export class UsersService {
       ipAddress,
     });
 
-
     return project;
+  }
+
+  async deleteUser(userId: string, actor: any, ipAddress?: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { role: true },
+    });
+    if (!user) throw new NotFoundException(`User ${userId} not found`);
+
+    if (actor.id === userId) {
+      throw new BadRequestException('You cannot remove your own administrator account');
+    }
+
+    const superAdminEmail = process.env.SUPER_ADMIN_EMAIL || 'akshay.m@datai2i.com';
+    if (user.email === superAdminEmail) {
+      throw new BadRequestException('Cannot remove the root organization administrator');
+    }
+
+    // Clean up all related records before deleting user
+    await this.prisma.$transaction([
+      this.prisma.session.deleteMany({ where: { userId } }),
+      this.prisma.googleAccount.deleteMany({ where: { userId } }),
+      this.prisma.projectMember.deleteMany({ where: { userId } }),
+      this.prisma.teamMember.deleteMany({ where: { userId } }),
+      this.prisma.taskWatcher.deleteMany({ where: { userId } }),
+      this.prisma.taskPoint.updateMany({ where: { completedById: userId }, data: { completedById: null } }),
+      this.prisma.taskPoint.deleteMany({ where: { authorId: userId } }),
+      this.prisma.acceptanceCriterion.updateMany({ where: { completedById: userId }, data: { completedById: null } }),
+      this.prisma.acceptanceCriterion.deleteMany({ where: { createdById: userId } }),
+      this.prisma.taskEvidence.deleteMany({ where: { uploaderId: userId } }),
+      this.prisma.taskComment.deleteMany({ where: { authorId: userId } }),
+      this.prisma.taskActivity.deleteMany({ where: { actorId: userId } }),
+      this.prisma.standup.deleteMany({ where: { userId } }),
+      this.prisma.meetingParticipant.deleteMany({ where: { userId } }),
+      this.prisma.meetingActionItem.updateMany({ where: { assigneeId: userId }, data: { assigneeId: null } }),
+      this.prisma.notification.deleteMany({ where: { userId } }),
+      this.prisma.notificationPreference.deleteMany({ where: { userId } }),
+      this.prisma.userCapacity.deleteMany({ where: { userId } }),
+      this.prisma.projectDecision.deleteMany({ where: { decidedById: userId } }),
+      this.prisma.task.updateMany({ where: { assigneeId: userId }, data: { assigneeId: null } }),
+      this.prisma.task.deleteMany({ where: { creatorId: userId } }),
+      this.prisma.project.updateMany({ where: { leadId: userId }, data: { leadId: null } }),
+      this.prisma.team.updateMany({ where: { leadId: userId }, data: { leadId: null } }),
+      this.prisma.meeting.deleteMany({ where: { organizerId: userId } }),
+      this.prisma.automationRule.deleteMany({ where: { creatorId: userId } }),
+      this.prisma.user.delete({ where: { id: userId } }),
+    ]);
+
+    await this.auditService.log({
+      actorId: actor.id,
+      action: 'USER_REMOVED',
+      entityName: 'User',
+      entityId: userId,
+      metadata: { email: user.email, fullName: user.fullName, employeeId: user.employeeId },
+      ipAddress,
+    });
+
+    return {
+      success: true,
+      message: `User ${user.fullName} (${user.email}) permanently removed from platform`,
+    };
   }
 }
 

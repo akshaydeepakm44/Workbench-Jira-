@@ -134,6 +134,16 @@ export class UsersController {
     return this.usersService.revokeInvitation(id, actor, req.ip);
   }
 
+  @Delete(':id')
+  @RequirePermissions(Permission.MANAGE_USERS)
+  async deleteUser(
+    @Param('id') id: string,
+    @CurrentUser() actor: any,
+    @Req() req: Request,
+  ) {
+    return this.usersService.deleteUser(id, actor, req.ip);
+  }
+
   @Get(':id')
   async getUser(@Param('id') id: string) {
     return this.usersService.findOne(id);
