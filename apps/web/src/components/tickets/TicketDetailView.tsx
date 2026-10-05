@@ -18,12 +18,27 @@ import {
   AlertTriangle,
   GitBranch,
   ChevronRight,
+  ChevronDown,
   ArrowLeft,
   Send,
   Edit2,
   Save,
   X,
+  Search,
+  Check,
+  UserPlus,
+  Loader2,
+  AtSign,
 } from 'lucide-react';
+
+interface UserOption {
+  id: string;
+  fullName: string;
+  email: string;
+  roleCode?: string;
+  roleName?: string;
+  avatarUrl?: string;
+}
 
 export const TicketDetailView: React.FC = () => {
   const { ticketId } = useParams<{ ticketId: string }>();
@@ -41,6 +56,13 @@ export const TicketDetailView: React.FC = () => {
   const [description, setDescription] = useState('');
   const [actualHours, setActualHours] = useState<number | ''>('');
   const [commentText, setCommentText] = useState('');
+
+  // Assignee editing and tagging state
+  const [usersList, setUsersList] = useState<UserOption[]>([]);
+  const [isEditingAssignee, setIsEditingAssignee] = useState(false);
+  const [assigneeSearch, setAssigneeSearch] = useState('');
+  const [isSavingAssignee, setIsSavingAssignee] = useState(false);
+  const [assigneeMessage, setAssigneeMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Status transition state
   const [transitionError, setTransitionError] = useState<string | null>(null);
@@ -75,6 +97,44 @@ export const TicketDetailView: React.FC = () => {
   useEffect(() => {
     fetchTicket();
   }, [ticketId]);
+
+  useEffect(() => {
+    fetch('/api/v1/users', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        if (Array.isArray(data)) setUsersList(data);
+      })
+      .catch((err) => console.error('Failed to load users for assignee picker:', err));
+  }, []);
+
+  const handleUpdateAssignee = async (newAssigneeId: string | null) => {
+    if (!task) return;
+    setIsSavingAssignee(true);
+    setAssigneeMessage(null);
+    try {
+      const res = await fetch(`/api/v1/tasks/${task.ticketId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ assigneeId: newAssigneeId }),
+      });
+      if (res.ok) {
+        setAssigneeMessage({ type: 'success', text: 'Assignee updated successfully!' });
+        setTimeout(() => setAssigneeMessage(null), 3500);
+        setIsEditingAssignee(false);
+        setAssigneeSearch('');
+        await fetchTicket();
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setAssigneeMessage({ type: 'error', text: errData.message || 'Failed to update assignee' });
+      }
+    } catch (err: any) {
+      console.error(err);
+      setAssigneeMessage({ type: 'error', text: err.message || 'Network error updating assignee' });
+    } finally {
+      setIsSavingAssignee(false);
+    }
+  };
 
   const handleSaveTitle = async () => {
     if (!task || !title.trim()) return;
@@ -246,6 +306,16 @@ export const TicketDetailView: React.FC = () => {
   };
 
   const nextTransitions = getNextTransitions(task.status);
+
+  const filteredUsers = usersList.filter((u) => {
+    if (!assigneeSearch.trim()) return true;
+    const q = assigneeSearch.toLowerCase();
+    return (
+      (u.fullName && u.fullName.toLowerCase().includes(q)) ||
+      (u.email && u.email.toLowerCase().includes(q)) ||
+      (u.roleName && u.roleName.toLowerCase().includes(q))
+    );
+  });
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
@@ -523,6 +593,25 @@ export const TicketDetailView: React.FC = () => {
               )}
             </div>
 
+            {/* Quick Tag Member Chips */}
+            {usersList.length > 0 && (
+              <div className="flex items-center gap-1.5 overflow-x-auto py-1 text-[11px] text-slate-400 no-scrollbar">
+                <span className="text-slate-500 flex items-center gap-1 shrink-0">
+                  <AtSign className="w-3 h-3 text-indigo-400" /> Tag:
+                </span>
+                {usersList.slice(0, 6).map((u) => (
+                  <button
+                    key={u.id}
+                    type="button"
+                    onClick={() => setCommentText((prev) => (prev ? `${prev} @${u.fullName} ` : `@${u.fullName} `))}
+                    className="px-2 py-0.5 rounded-full bg-slate-950 border border-slate-800 hover:border-indigo-500/60 hover:text-indigo-300 text-slate-300 text-[11px] shrink-0 transition-colors"
+                  >
+                    @{u.fullName}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {/* Add Comment Input */}
             <form onSubmit={handleAddComment} className="flex gap-2 pt-2 border-t border-slate-800">
               <input
@@ -585,13 +674,185 @@ export const TicketDetailView: React.FC = () => {
               People & Ownership
             </h4>
 
-            <div className="flex items-center justify-between">
-              <span className="text-slate-400">Assignee</span>
-              <div className="flex items-center gap-1.5 font-medium text-white">
-                <User className="w-3.5 h-3.5 text-indigo-400" />
-                <span>{task.assigneeName || 'Unassigned'}</span>
+            {/* Assignee Row / Editor */}
+            {!isEditingAssignee ? (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 font-medium">Assignee</span>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingAssignee(true)}
+                    className="flex items-center gap-1 text-[11px] font-semibold text-indigo-400 hover:text-indigo-300 hover:bg-indigo-950/60 px-2 py-0.5 rounded border border-indigo-800/50 transition-all shadow-sm"
+                  >
+                    <Edit2 className="w-3 h-3" />
+                    <span>Change / Tag</span>
+                  </button>
+                </div>
+
+                <div
+                  onClick={() => setIsEditingAssignee(true)}
+                  className="p-2.5 rounded-lg bg-slate-950 border border-slate-800/80 hover:border-indigo-500/60 cursor-pointer flex items-center justify-between transition-all group shadow-sm"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-[11px] font-bold text-white shadow-inner uppercase shrink-0">
+                      {task.assigneeName ? task.assigneeName.slice(0, 2) : <User className="w-3.5 h-3.5" />}
+                    </div>
+                    <div className="truncate">
+                      <div className="font-semibold text-white group-hover:text-indigo-300 transition-colors flex items-center gap-1.5 truncate">
+                        <span className="truncate">{task.assigneeName || 'Unassigned'}</span>
+                        {task.assigneeId === user?.id && (
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-indigo-900/60 text-indigo-300 border border-indigo-700/50 shrink-0">
+                            You
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-slate-500 block truncate">
+                        {task.assigneeName ? 'Click to reassign or tag someone' : 'Click to assign or tag someone'}
+                      </span>
+                    </div>
+                  </div>
+                  <ChevronDown className="w-4 h-4 text-slate-500 group-hover:text-slate-300 shrink-0 ml-2 transition-colors" />
+                </div>
+
+                {assigneeMessage && (
+                  <div
+                    className={`text-[11px] font-medium flex items-center gap-1.5 pt-1 ${
+                      assigneeMessage.type === 'success' ? 'text-emerald-400' : 'text-rose-400'
+                    }`}
+                  >
+                    {assigneeMessage.type === 'success' ? (
+                      <Check className="w-3.5 h-3.5" />
+                    ) : (
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                    )}
+                    <span>{assigneeMessage.text}</span>
+                  </div>
+                )}
               </div>
-            </div>
+            ) : (
+              <div className="space-y-3 p-3 rounded-xl bg-slate-950 border border-indigo-500/50 shadow-xl">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <UserPlus className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>Assign / Tag Someone</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditingAssignee(false);
+                      setAssigneeSearch('');
+                    }}
+                    className="text-slate-400 hover:text-white p-1 rounded-md hover:bg-slate-800 transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* Search Filter */}
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    autoFocus
+                    value={assigneeSearch}
+                    onChange={(e) => setAssigneeSearch(e.target.value)}
+                    placeholder="Search member name or email..."
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                {/* Quick Shortcuts */}
+                <div className="flex items-center gap-2">
+                  {user && task.assigneeId !== user.id && (
+                    <button
+                      type="button"
+                      disabled={isSavingAssignee}
+                      onClick={() => handleUpdateAssignee(user.id)}
+                      className="text-[10px] font-semibold px-2 py-1 rounded bg-indigo-900/40 hover:bg-indigo-800 text-indigo-300 border border-indigo-700/50 transition-colors flex items-center gap-1"
+                    >
+                      <User className="w-3 h-3" />
+                      Assign to me
+                    </button>
+                  )}
+                  {task.assigneeId && (
+                    <button
+                      type="button"
+                      disabled={isSavingAssignee}
+                      onClick={() => handleUpdateAssignee(null)}
+                      className="text-[10px] font-semibold px-2 py-1 rounded bg-slate-900 hover:bg-rose-950/50 text-slate-400 hover:text-rose-300 border border-slate-800 hover:border-rose-800/50 transition-colors flex items-center gap-1"
+                    >
+                      <X className="w-3 h-3" />
+                      Unassign
+                    </button>
+                  )}
+                </div>
+
+                {/* Member List */}
+                <div className="max-h-44 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+                  {filteredUsers.length === 0 ? (
+                    <div className="text-center py-4 text-xs text-slate-500">
+                      No members matching "{assigneeSearch}"
+                    </div>
+                  ) : (
+                    filteredUsers.map((u) => {
+                      const isSelected = task.assigneeId === u.id;
+                      return (
+                        <button
+                          key={u.id}
+                          type="button"
+                          disabled={isSavingAssignee}
+                          onClick={() => handleUpdateAssignee(u.id)}
+                          className={`w-full text-left p-2 rounded-lg text-xs flex items-center justify-between transition-all group ${
+                            isSelected
+                              ? 'bg-indigo-600/20 border border-indigo-500/60 text-white'
+                              : 'bg-slate-900/60 border border-transparent hover:bg-slate-800/80 hover:border-slate-700 text-slate-200'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="w-6 h-6 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-[10px] font-bold text-slate-300 uppercase shrink-0">
+                              {u.fullName ? u.fullName.slice(0, 2) : 'U'}
+                            </div>
+                            <div className="truncate">
+                              <div className="font-medium text-white flex items-center gap-1.5 truncate">
+                                <span className="truncate">{u.fullName}</span>
+                                {u.id === user?.id && (
+                                  <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-indigo-950 text-indigo-400 border border-indigo-800 shrink-0">
+                                    You
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[10px] text-slate-400 flex items-center gap-1 truncate">
+                                <span className="truncate">{u.email}</span>
+                                {u.roleName && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="text-indigo-400 shrink-0">{u.roleName}</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          {isSelected ? (
+                            <Check className="w-4 h-4 text-indigo-400 shrink-0 ml-2" />
+                          ) : (
+                            <span className="text-[10px] font-medium text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-2">
+                              Assign
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+
+                {isSavingAssignee && (
+                  <div className="flex items-center justify-center gap-2 text-xs text-indigo-400 py-1 border-t border-slate-800">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Saving new assignee...</span>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="flex items-center justify-between">
               <span className="text-slate-400">Reporter / Creator</span>

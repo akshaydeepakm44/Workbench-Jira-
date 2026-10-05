@@ -226,6 +226,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, Permission[]> = {
     Permission.MANAGE_ACCEPTANCE_CRITERIA,
     Permission.ADD_WORK_EVIDENCE,
     Permission.MANAGE_DEPENDENCIES,
+    Permission.ASSIGN_TASK,
     Permission.TOGGLE_TASK_POINT,
     Permission.VIEW_OWN_STANDUPS,
     Permission.CREATE_MEETING,

@@ -688,10 +688,16 @@ export class TasksService {
     }
 
     if (dto.assigneeId !== undefined) {
-      if (user.roleCode === RoleCode.ROLE_EMPLOYEE && dto.assigneeId !== user.id) {
-        throw new ForbiddenException('Employees cannot assign tasks to other users');
+      data.assigneeId = dto.assigneeId ? dto.assigneeId : null;
+      if (user.id && existing.assigneeId && existing.assigneeId !== data.assigneeId) {
+        try {
+          await this.prisma.taskWatcher.upsert({
+            where: { taskId_userId: { taskId: existing.id, userId: user.id } },
+            create: { taskId: existing.id, userId: user.id },
+            update: {},
+          });
+        } catch (_) {}
       }
-      data.assigneeId = dto.assigneeId;
     }
 
     const updated = await this.prisma.task.update({
