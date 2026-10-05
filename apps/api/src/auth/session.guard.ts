@@ -2,6 +2,7 @@ import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from
 import { Reflector } from '@nestjs/core';
 import { PrismaService } from '../prisma/prisma.service';
 import { PUBLIC_KEY } from './auth.decorators';
+import { ROLE_PERMISSIONS, RoleCode } from '@workdesk/shared';
 
 @Injectable()
 export class SessionGuard implements CanActivate {
@@ -55,6 +56,13 @@ export class SessionGuard implements CanActivate {
       parsedPermissions = JSON.parse(session.user.role.permissions);
     } catch {
       parsedPermissions = [];
+    }
+
+    // Self-healing fallback: if DB permissions are stale/empty, use authoritative code-side list
+    const roleCode = session.user.role.code as RoleCode;
+    const codePerms: string[] = ROLE_PERMISSIONS[roleCode] ?? [];
+    if (codePerms.length > 0 && parsedPermissions.length < codePerms.length) {
+      parsedPermissions = codePerms as string[];
     }
 
     const ledTeamIds = [
