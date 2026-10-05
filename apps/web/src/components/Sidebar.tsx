@@ -95,11 +95,8 @@ export const Sidebar: React.FC = () => {
                 <FileText className="w-4 h-4 text-cyan-400" />
                 <span>Reports Center</span>
               </NavLink>
-              <NavLink to="/automation" className={navItemClass}>
-                <Activity className="w-4 h-4 text-indigo-400" />
-                <span>Automation Rules</span>
-              </NavLink>
             </nav>
+
           </div>
         )}
 

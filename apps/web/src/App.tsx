@@ -25,8 +25,8 @@ import { CalendarPage } from './pages/CalendarPage';
 
 import { ControlTowerPage } from './pages/ControlTowerPage';
 import { ProjectDecisionsPage } from './pages/ProjectDecisionsPage';
-import { AutomationRulesPage } from './pages/AutomationRulesPage';
 import { RoleCode } from '@workdesk/shared';
+
 
 const ProtectedRoute: React.FC<{ children: React.ReactElement; requiredRole?: RoleCode }> = ({
   children,
@@ -100,7 +100,8 @@ export const App: React.FC = () => {
 
             <Route path="control-tower" element={<ControlTowerPage />} />
             <Route path="decisions" element={<ProjectDecisionsPage />} />
-            <Route path="automation" element={<AutomationRulesPage />} />
+            <Route path="automation" element={<Navigate to="/dashboard" replace />} />
+
 
             {/* Approvals & Provisioning Hub */}
             <Route
