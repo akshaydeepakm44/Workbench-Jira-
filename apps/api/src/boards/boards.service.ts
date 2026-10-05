@@ -54,7 +54,7 @@ export class BoardsService {
   ): Promise<BoardDto[]> {
     await this.verifyProjectAccess(projectId, user);
 
-    const boards = await this.prisma.board.findMany({
+    let boards = await this.prisma.board.findMany({
       where: { projectId },
       include: {
         project: { select: { name: true } },
@@ -63,8 +63,35 @@ export class BoardsService {
       orderBy: { createdAt: 'asc' },
     });
 
+    if (boards.length === 0) {
+      const defaultColumns = [
+        { name: 'To Do', orderIndex: 0, wipLimit: 0, wipLimitType: 'WARNING', mappedStatuses: JSON.stringify(['TODO', 'REOPENED', 'DRAFT']) },
+        { name: 'In Progress', orderIndex: 1, wipLimit: 10, wipLimitType: 'WARNING', mappedStatuses: JSON.stringify(['IN_PROGRESS']) },
+        { name: 'In Review', orderIndex: 2, wipLimit: 5, wipLimitType: 'WARNING', mappedStatuses: JSON.stringify(['IN_REVIEW', 'CHANGES_REQUESTED']) },
+        { name: 'Completed', orderIndex: 3, wipLimit: 0, wipLimitType: 'WARNING', mappedStatuses: JSON.stringify(['APPROVED', 'DONE']) },
+        { name: 'Blockers', orderIndex: 4, wipLimit: 0, wipLimitType: 'WARNING', mappedStatuses: JSON.stringify(['BLOCKED']) },
+      ];
+
+      const newBoard = await this.prisma.board.create({
+        data: {
+          projectId,
+          name: 'Agile Kanban Board',
+          type: BoardType.KANBAN,
+          createdById: user.id,
+          columns: { create: defaultColumns },
+        },
+        include: {
+          project: { select: { name: true } },
+          columns: { orderBy: { orderIndex: 'asc' } },
+        },
+      });
+
+      boards = [newBoard];
+    }
+
     return boards.map((b) => this.mapBoard(b));
   }
+
 
   async getBoardById(
     boardId: string,
@@ -186,8 +213,8 @@ export class BoardsService {
       where,
       orderBy: [{ rank: 'asc' }, { createdAt: 'asc' }],
       include: {
-        creator: { select: { fullName: true } },
-        assignee: { select: { fullName: true } },
+        creator: { select: { id: true, fullName: true } },
+        assignee: { select: { id: true, fullName: true, email: true, avatarUrl: true } },
         project: { select: { name: true } },
         team: { select: { name: true } },
         sprint: { select: { id: true, name: true } },
@@ -205,8 +232,12 @@ export class BoardsService {
     const mappedTasks = tasks.map((t) => ({
       ...t,
       creatorName: t.creator?.fullName,
-      assigneeName: t.assignee?.fullName,
+      assigneeId: t.assigneeId,
+      assigneeName: t.assignee?.fullName || null,
+      assigneeAvatar: t.assignee?.avatarUrl || null,
+      assigneeEmail: t.assignee?.email || null,
       projectName: t.project?.name,
+
       teamName: t.team?.name,
       sprintName: t.sprint?.name || null,
       urgency: this.tasksService.calculateUrgency(t.deadline, t.status),
