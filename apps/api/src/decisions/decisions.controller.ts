@@ -28,6 +28,11 @@ export class DecisionsController {
     return this.decisionsService.getDecisions(projectId, (req as any).user);
   }
 
+  @Get('dashboard')
+  async getDashboardDecisions(@Req() req: Request): Promise<ProjectDecisionDto[]> {
+    return this.decisionsService.getDashboardDecisions((req as any).user);
+  }
+
   @Get(':id')
   async getDecision(
     @Param('id') id: string,

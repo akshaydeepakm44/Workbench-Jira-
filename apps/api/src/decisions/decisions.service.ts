@@ -23,10 +23,10 @@ export class DecisionsService {
 
     if (user.roleCode === RoleCode.ROLE_EMPLOYEE) {
       const isMember = project.members.some((m) => m.userId === user.id);
-      if (!isMember) throw new NotFoundException(`Project ${projectId} not found`);
+      if (!isMember && project.key !== 'DESK') throw new NotFoundException(`Project ${projectId} not found`);
     } else if (user.roleCode === RoleCode.ROLE_LEAD) {
       const isLeadOrMember = project.leadId === user.id || project.members.some((m) => m.userId === user.id);
-      if (!isLeadOrMember) throw new NotFoundException(`Project ${projectId} not found`);
+      if (!isLeadOrMember && project.key !== 'DESK') throw new NotFoundException(`Project ${projectId} not found`);
     }
     return project;
   }
@@ -149,6 +149,83 @@ export class DecisionsService {
         return d.decidedById === user.id;
       }
       // 2. CORE: visible to employees, hr, leads, managers, but NOT interns / external
+      if (vis === 'CORE') {
+        if (isIntern) return false;
+        return true;
+      }
+      // 3. TEAM: visible to everyone
+      return true;
+    });
+
+    return visibleDecisions.map((d) => ({
+      id: d.id,
+      projectId: d.projectId,
+      projectName: d.project.name,
+      title: d.title,
+      summary: d.summary,
+      rationale: d.rationale,
+      status: d.status,
+      visibility: d.visibility,
+      decidedById: d.decidedById,
+      decidedByName: d.decidedBy.fullName,
+      meetingId: d.meetingId,
+      meetingTitle: d.meeting?.title || null,
+      taskId: d.taskId,
+      createdAt: d.createdAt.toISOString(),
+      updatedAt: d.updatedAt.toISOString(),
+    }));
+  }
+
+  async getDashboardDecisions(user: { id: string; roleCode: RoleCode }): Promise<ProjectDecisionDto[]> {
+    const isIntern = await this.checkIsIntern(user.id);
+
+    // If Manager: can see decisions across all projects
+    // If Lead or Employee: find projects they belong to or lead (plus default workspace project)
+    let projectWhere: any = {};
+    if (user.roleCode !== RoleCode.ROLE_MANAGER) {
+      const [memberships, ledProjects, defaultProj] = await Promise.all([
+        this.prisma.projectMember.findMany({
+          where: { userId: user.id },
+          select: { projectId: true },
+        }),
+        this.prisma.project.findMany({
+          where: { leadId: user.id },
+          select: { id: true },
+        }),
+        this.prisma.project.findFirst({
+          where: { key: 'DESK' },
+          select: { id: true },
+        }),
+      ]);
+
+      const projectIds = new Set<string>();
+      memberships.forEach((m) => projectIds.add(m.projectId));
+      ledProjects.forEach((p) => projectIds.add(p.id));
+      if (defaultProj) projectIds.add(defaultProj.id);
+
+      projectWhere = {
+        projectId: { in: Array.from(projectIds) },
+      };
+    }
+
+    const decisions = await this.prisma.projectDecision.findMany({
+      where: projectWhere,
+      include: {
+        project: { select: { name: true } },
+        decidedBy: { select: { fullName: true } },
+        meeting: { select: { title: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    });
+
+    const visibleDecisions = decisions.filter((d) => {
+      const vis = (d.visibility || 'TEAM').toUpperCase();
+      // 1. MYSELF: only visible to the author
+      if (vis === 'MYSELF') {
+        return d.decidedById === user.id;
+      }
+      // 2. CORE: visible to core employees, leads, managers, but NOT interns
       if (vis === 'CORE') {
         if (isIntern) return false;
         return true;
