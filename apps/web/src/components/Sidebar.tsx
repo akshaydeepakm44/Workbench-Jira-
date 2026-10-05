@@ -9,10 +9,8 @@ import {
   Video,
   BarChart3,
   FileText,
-  Users,
   Settings,
   Shield,
-  Layers,
   Columns,
   ListOrdered,
   CalendarDays,
@@ -108,15 +106,7 @@ export const Sidebar: React.FC = () => {
             <nav className="space-y-1">
               <NavLink to="/admin/super" className={navItemClass}>
                 <Shield className="w-4 h-4 text-purple-400" />
-                <span>Approvals & Provisioning</span>
-              </NavLink>
-              <NavLink to="/admin/users" className={navItemClass}>
-                <Users className="w-4 h-4 text-purple-400" />
-                <span>User Management</span>
-              </NavLink>
-              <NavLink to="/admin/workflows" className={navItemClass}>
-                <Layers className="w-4 h-4 text-purple-400" />
-                <span>Workflows & Urgency</span>
+                <span>Manager Governance</span>
               </NavLink>
               <NavLink to="/admin/audit" className={navItemClass}>
                 <Shield className="w-4 h-4 text-purple-400" />

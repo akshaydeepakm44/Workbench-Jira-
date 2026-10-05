@@ -7,7 +7,6 @@ import { AcceptInvitationPage } from './pages/AcceptInvitationPage';
 import { PendingApprovalPage } from './pages/PendingApprovalPage';
 import { ManagerGovernancePage } from './pages/ManagerGovernancePage';
 import { DashboardPage } from './pages/DashboardPage';
-import { UsersPage } from './pages/UsersPage';
 import { TasksPage } from './pages/TasksPage';
 import { TicketDetailView } from './components/tickets/TicketDetailView';
 import { StandupPage } from './pages/StandupPage';
@@ -15,7 +14,6 @@ import { MeetingsPage } from './pages/MeetingsPage';
 import { MeetingWorkspacePage } from './pages/MeetingWorkspacePage';
 import { ProgressPage } from './pages/ProgressPage';
 import { ReportsPage } from './pages/ReportsPage';
-import { WorkflowsPage } from './pages/WorkflowsPage';
 import { AuditPage } from './pages/AuditPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { BacklogPage } from './pages/BacklogPage';
@@ -124,19 +122,11 @@ export const App: React.FC = () => {
             {/* Manager Governance Routes */}
             <Route
               path="admin/users"
-              element={
-                <ProtectedRoute requiredRole={RoleCode.ROLE_MANAGER}>
-                  <UsersPage />
-                </ProtectedRoute>
-              }
+              element={<Navigate to="/admin/super" replace />}
             />
             <Route
               path="admin/workflows"
-              element={
-                <ProtectedRoute requiredRole={RoleCode.ROLE_MANAGER}>
-                  <WorkflowsPage />
-                </ProtectedRoute>
-              }
+              element={<Navigate to="/admin/super" replace />}
             />
             <Route
               path="admin/audit"
