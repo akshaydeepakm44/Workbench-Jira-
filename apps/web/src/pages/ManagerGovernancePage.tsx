@@ -205,6 +205,7 @@ export const ManagerGovernancePage: React.FC = () => {
           employeeId: onboardEmpId.trim(),
           projectId: onboardProjectId || undefined,
           isLead: Boolean(onboardProjectId && onboardIsLead),
+          isProjectLead: Boolean(onboardProjectId && onboardIsLead),
         }),
       });
 

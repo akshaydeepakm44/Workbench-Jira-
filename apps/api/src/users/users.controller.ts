@@ -3,7 +3,7 @@ import { UsersService } from './users.service';
 import { RequirePermissions } from '../auth/auth.decorators';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { Permission, RoleCode } from '@workdesk/shared';
-import { IsEnum, IsNotEmpty, IsOptional, IsString, IsEmail } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsOptional, IsString, IsEmail, IsBoolean } from 'class-validator';
 import { Request } from 'express';
 
 class UpdateRoleDto {
@@ -69,7 +69,12 @@ class InviteUserDto {
   projectId?: string;
 
   @IsOptional()
+  @IsBoolean()
   isProjectLead?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isLead?: boolean;
 }
 
 @Controller('users')

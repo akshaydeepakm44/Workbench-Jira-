@@ -11,6 +11,7 @@ export interface InviteUserDto {
   employeeId?: string;
   projectId?: string;
   isProjectLead?: boolean;
+  isLead?: boolean;
 }
 
 @Injectable()
@@ -463,15 +464,16 @@ export class UsersService {
       include: { role: true },
     });
 
+    const isProjectLead = Boolean(dto.isLead !== undefined ? dto.isLead : dto.isProjectLead);
     if (project) {
-      const roleInProject = dto.isProjectLead ? 'LEAD' : 'CONTRIBUTOR';
+      const roleInProject = isProjectLead ? 'LEAD' : 'CONTRIBUTOR';
       await this.prisma.projectMember.upsert({
         where: { projectId_userId: { projectId: project.id, userId: user.id } },
         update: { roleInProject },
         create: { projectId: project.id, userId: user.id, roleInProject },
       });
 
-      if (dto.isProjectLead) {
+      if (isProjectLead) {
         await this.prisma.project.update({
           where: { id: project.id },
           data: { leadId: user.id },
@@ -515,7 +517,7 @@ export class UsersService {
         email: cleanEmail,
         employeeId: cleanEmpId,
         projectId: project?.id,
-        isLead: dto.isProjectLead || false,
+        isLead: isProjectLead,
         invitationExpiresAt,
         emailStatus,
       },
