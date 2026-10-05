@@ -82,6 +82,7 @@ export const ManagerGovernancePage: React.FC = () => {
 
   // Invitation Success Modal
   const [createdInviteLink, setCreatedInviteLink] = useState<string | null>(null);
+  const [createdEmailPreviewUrl, setCreatedEmailPreviewUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   // Quick Project Modal
@@ -215,7 +216,9 @@ export const ManagerGovernancePage: React.FC = () => {
       }
 
       setIsOnboardModalOpen(false);
-      setCreatedInviteLink(`${window.location.origin}/accept-invitation?token=${data.token}`);
+      const link = data.inviteLink || `${window.location.origin}/accept-invitation?token=${data.token || data.rawToken}`;
+      setCreatedInviteLink(link);
+      setCreatedEmailPreviewUrl(data.emailPreviewUrl || null);
       fetchData();
     } catch (err: any) {
       setOnboardError(err.message || 'Onboarding failed');
@@ -235,7 +238,9 @@ export const ManagerGovernancePage: React.FC = () => {
         alert(data.message || 'Failed to resend invitation');
         return;
       }
-      setCreatedInviteLink(`${window.location.origin}/accept-invitation?token=${data.token}`);
+      const link = data.inviteLink || `${window.location.origin}/accept-invitation?token=${data.token || data.rawToken}`;
+      setCreatedInviteLink(link);
+      setCreatedEmailPreviewUrl(data.emailPreviewUrl || null);
       fetchData();
     } catch (err: any) {
       alert(err.message || 'Failed to resend invitation');
@@ -984,12 +989,38 @@ export const ManagerGovernancePage: React.FC = () => {
               <p className="text-[11px] text-slate-400 leading-relaxed">
                 An invitation email was dispatched to the employee. They will visit this link and enter a 6-digit OTP code sent to their corporate inbox to verify identity and activate their workspace session.
               </p>
+
+              {createdEmailPreviewUrl && (
+                <div className="p-3.5 rounded-xl bg-indigo-950/40 border border-indigo-500/40 space-y-2 mt-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-indigo-300 flex items-center gap-1.5">
+                      <Mail className="w-3.5 h-3.5 text-indigo-400" />
+                      Live Dispatched Email (Ethereal Inbox)
+                    </span>
+                    <a
+                      href={createdEmailPreviewUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-[11px] flex items-center gap-1 transition-colors"
+                    >
+                      <span>Open Sent Mail</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    The invitation email was delivered over live SMTP. You can preview the recipient email and click &quot;Accept &amp; Verify Invitation&quot; directly from the inbox.
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end pt-2">
               <button
                 type="button"
-                onClick={() => setCreatedInviteLink(null)}
+                onClick={() => {
+                  setCreatedInviteLink(null);
+                  setCreatedEmailPreviewUrl(null);
+                }}
                 className="px-6 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold transition-all cursor-pointer"
               >
                 Done

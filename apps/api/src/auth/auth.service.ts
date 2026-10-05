@@ -515,23 +515,27 @@ export class AuthService {
     });
 
     let emailStatus: 'SENT' | 'PENDING_ENVIRONMENT' = 'PENDING_ENVIRONMENT';
+    let emailPreviewUrl: string | null = null;
     try {
-      const sent = await this.emailService.sendMail({
+      const emailResult = await this.emailService.sendMail({
         to: user.email,
         subject: 'Your WorkDesk Verification Code',
         html: `
-          <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
-            <h2 style="color: #2563eb;">Identity Confirmation</h2>
-            <p>Hello <strong>${user.fullName}</strong>,</p>
-            <p>Your one-time verification code is:</p>
-            <div style="font-size: 28px; font-weight: bold; letter-spacing: 6px; color: #1e293b; background: #f1f5f9; padding: 12px; text-align: center; border-radius: 6px; margin: 16px 0;">
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 500px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
+            <h2 style="color: #4f46e5; margin: 0 0 8px 0; font-size: 20px;">Identity Confirmation</h2>
+            <p style="color: #334155; font-size: 14px;">Hello <strong>${user.fullName}</strong>,</p>
+            <p style="color: #475569; font-size: 14px;">Your 6-digit one-time verification code is:</p>
+            <div style="font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #1e1b4b; background: #e0e7ff; padding: 14px; text-align: center; border-radius: 8px; margin: 20px 0; font-family: monospace;">
               ${otp}
             </div>
             <p style="color: #64748b; font-size: 13px;">This code will expire in 10 minutes. If you did not request this, please ignore this email.</p>
           </div>
         `,
+        text: `Hello ${user.fullName},\n\nYour WorkDesk one-time verification code is: ${otp}\n\nThis code will expire in 10 minutes.`,
+        templateName: 'INVITATION_OTP',
       });
-      emailStatus = sent ? 'SENT' : 'PENDING_ENVIRONMENT';
+      emailStatus = emailResult.success ? 'SENT' : 'PENDING_ENVIRONMENT';
+      emailPreviewUrl = emailResult.previewUrl || null;
     } catch {
       emailStatus = 'PENDING_ENVIRONMENT';
     }
@@ -541,7 +545,7 @@ export class AuthService {
       action: 'INVITATION_OTP_DISPATCHED',
       entityName: 'User',
       entityId: user.id,
-      metadata: { email: user.email, otpExpiresAt, emailStatus },
+      metadata: { email: user.email, otpExpiresAt, emailStatus, emailPreviewUrl },
       ipAddress,
     });
 
@@ -551,6 +555,7 @@ export class AuthService {
       expiresInSeconds: 600,
       cooldownSeconds: 60,
       devOtp: process.env.NODE_ENV !== 'production' ? otp : undefined,
+      emailPreviewUrl,
     };
   }
 

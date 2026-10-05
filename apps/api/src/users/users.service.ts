@@ -484,26 +484,40 @@ export class UsersService {
     const appUrl = process.env.APP_URL || 'http://localhost:5174';
     const inviteLink = `${appUrl}/accept-invitation?token=${rawToken}`;
     let emailStatus: 'SENT' | 'PENDING_ENVIRONMENT' = 'PENDING_ENVIRONMENT';
+    let emailPreviewUrl: string | null = null;
 
     try {
-      const sent = await this.emailService.sendMail({
+      const emailResult = await this.emailService.sendMail({
         to: cleanEmail,
         subject: `You have been invited to WorkDesk by ${actor.fullName || 'Manager'}`,
         html: `
-          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
-            <h2 style="color: #2563eb;">Welcome to WorkDesk</h2>
-            <p>Hello <strong>${user.fullName}</strong>,</p>
-            <p>You have been invited to join WorkDesk as <strong>${role.name}</strong>${project ? ` on <strong>${project.name}</strong>` : ''}.</p>
-            <p style="margin: 24px 0;">
-              <a href="${inviteLink}" style="background-color: #2563eb; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff; color: #1e293b;">
+            <div style="margin-bottom: 20px;">
+              <h2 style="color: #4f46e5; margin: 0; font-size: 22px;">WorkDesk Invitation</h2>
+              <p style="color: #64748b; margin: 4px 0 0 0; font-size: 14px;">Productivity & Team Management</p>
+            </div>
+            <p style="font-size: 15px; line-height: 1.5;">Hello <strong>${user.fullName}</strong>,</p>
+            <p style="font-size: 15px; line-height: 1.5;">
+              You have been invited to join WorkDesk as <strong>${role.name}</strong>${project ? ` on <strong>${project.name}</strong>` : ''}.
+            </p>
+            <div style="margin: 28px 0; text-align: center;">
+              <a href="${inviteLink}" style="background-color: #4f46e5; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 15px; display: inline-block; box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);">
                 Accept & Verify Invitation
               </a>
+            </div>
+            <p style="color: #64748b; font-size: 13px; line-height: 1.5;">
+              Or copy and paste this verification URL into your browser:<br/>
+              <a href="${inviteLink}" style="color: #4f46e5; word-break: break-all;">${inviteLink}</a>
             </p>
-            <p style="color: #64748b; font-size: 13px;">This invitation link will expire in 72 hours.</p>
+            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
+            <p style="color: #94a3b8; font-size: 12px; margin: 0;">This invitation is valid for 72 hours. If you did not expect this invitation, you can ignore this email.</p>
           </div>
         `,
+        text: `Hello ${user.fullName},\n\nYou have been invited to join WorkDesk as ${role.name}${project ? ` on ${project.name}` : ''}.\n\nClick the link below to accept and verify your invitation:\n${inviteLink}\n\nThis invitation is valid for 72 hours.`,
+        templateName: 'USER_INVITATION',
       });
-      emailStatus = sent ? 'SENT' : 'PENDING_ENVIRONMENT';
+      emailStatus = emailResult.success ? 'SENT' : 'PENDING_ENVIRONMENT';
+      emailPreviewUrl = emailResult.previewUrl || null;
     } catch {
       emailStatus = 'PENDING_ENVIRONMENT';
     }
@@ -520,6 +534,7 @@ export class UsersService {
         isLead: isProjectLead,
         invitationExpiresAt,
         emailStatus,
+        emailPreviewUrl,
       },
       ipAddress,
     });
@@ -535,9 +550,11 @@ export class UsersService {
         status: user.invitationStatus,
         invitationExpiresAt: user.invitationExpiresAt,
       },
+      token: rawToken,
       rawToken,
       inviteLink,
       emailStatus,
+      emailPreviewUrl,
     };
   }
 
@@ -573,14 +590,40 @@ export class UsersService {
     const appUrl = process.env.APP_URL || 'http://localhost:5174';
     const inviteLink = `${appUrl}/accept-invitation?token=${rawToken}`;
     let emailStatus: 'SENT' | 'PENDING_ENVIRONMENT' = 'PENDING_ENVIRONMENT';
+    let emailPreviewUrl: string | null = null;
 
     try {
-      const sent = await this.emailService.sendMail({
+      const emailResult = await this.emailService.sendMail({
         to: user.email,
         subject: `Your WorkDesk Invitation (Resent)`,
-        html: `<p>Your updated invitation link is: <a href="${inviteLink}">Accept Invitation</a></p>`,
+        html: `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff; color: #1e293b;">
+            <div style="margin-bottom: 20px;">
+              <h2 style="color: #4f46e5; margin: 0; font-size: 22px;">WorkDesk Invitation (Resent)</h2>
+              <p style="color: #64748b; margin: 4px 0 0 0; font-size: 14px;">Productivity & Team Management</p>
+            </div>
+            <p style="font-size: 15px; line-height: 1.5;">Hello <strong>${user.fullName}</strong>,</p>
+            <p style="font-size: 15px; line-height: 1.5;">
+              Here is your updated invitation link to join WorkDesk:
+            </p>
+            <div style="margin: 28px 0; text-align: center;">
+              <a href="${inviteLink}" style="background-color: #4f46e5; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 15px; display: inline-block; box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);">
+                Accept & Verify Invitation
+              </a>
+            </div>
+            <p style="color: #64748b; font-size: 13px; line-height: 1.5;">
+              Or copy and paste this verification URL into your browser:<br/>
+              <a href="${inviteLink}" style="color: #4f46e5; word-break: break-all;">${inviteLink}</a>
+            </p>
+            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
+            <p style="color: #94a3b8; font-size: 12px; margin: 0;">This invitation is valid for 72 hours.</p>
+          </div>
+        `,
+        text: `Hello ${user.fullName},\n\nHere is your updated invitation link to join WorkDesk:\n${inviteLink}\n\nThis invitation is valid for 72 hours.`,
+        templateName: 'USER_INVITATION_RESENT',
       });
-      emailStatus = sent ? 'SENT' : 'PENDING_ENVIRONMENT';
+      emailStatus = emailResult.success ? 'SENT' : 'PENDING_ENVIRONMENT';
+      emailPreviewUrl = emailResult.previewUrl || null;
     } catch {
       emailStatus = 'PENDING_ENVIRONMENT';
     }
@@ -590,11 +633,11 @@ export class UsersService {
       action: 'USER_INVITATION_RESENT',
       entityName: 'User',
       entityId: user.id,
-      metadata: { email: user.email, newExpiresAt: invitationExpiresAt, emailStatus },
+      metadata: { email: user.email, newExpiresAt: invitationExpiresAt, emailStatus, emailPreviewUrl },
       ipAddress,
     });
 
-    return { success: true, rawToken, inviteLink, emailStatus };
+    return { success: true, token: rawToken, rawToken, inviteLink, emailStatus, emailPreviewUrl };
   }
 
   async revokeInvitation(userId: string, actor: any, ipAddress?: string) {

@@ -1,36 +1,82 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import * as nodemailer from 'nodemailer';
 
 @Injectable()
-export class EmailService {
+export class EmailService implements OnModuleInit {
   private readonly logger = new Logger(EmailService.name);
   private transporter: nodemailer.Transporter | null = null;
+  private etherealUser: string | null = null;
+  private initPromise: Promise<void> | null = null;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
-  ) {
-    this.initTransporter();
+  ) {}
+
+  async onModuleInit() {
+    this.initPromise = this.initTransporter();
+    await this.initPromise;
   }
 
-  private initTransporter() {
+  private async initTransporter(): Promise<void> {
+    const service = this.configService.get<string>('SMTP_SERVICE');
     const host = this.configService.get<string>('SMTP_HOST');
     const port = Number(this.configService.get<number>('SMTP_PORT')) || 587;
     const user = this.configService.get<string>('SMTP_USER');
     const pass = this.configService.get<string>('SMTP_PASS');
 
-    if (host && user && pass) {
-      this.transporter = nodemailer.createTransport({
-        host,
-        port,
-        secure: port === 465,
-        auth: { user, pass },
-      });
-      this.logger.log(`SMTP Email Transporter initialized with host: ${host}:${port}`);
+    if (user && pass) {
+      const cleanPass = pass.replace(/\s+/g, '');
+      const cleanUser = user.trim();
+
+      if (service?.toLowerCase() === 'gmail' || host?.includes('gmail') || cleanUser.endsWith('@gmail.com')) {
+        this.transporter = nodemailer.createTransport({
+          service: 'gmail',
+          auth: {
+            user: cleanUser,
+            pass: cleanPass,
+          },
+        });
+        this.logger.log(`Real Gmail SMTP Email Transporter configured for: ${cleanUser}`);
+      } else {
+        const smtpHost = host || 'smtp.gmail.com';
+        this.transporter = nodemailer.createTransport({
+          host: smtpHost,
+          port,
+          secure: port === 465,
+          auth: { user: cleanUser, pass: cleanPass },
+          tls: { rejectUnauthorized: false },
+        });
+        this.logger.log(`Real SMTP Email Transporter configured with host: ${smtpHost}:${port} for ${cleanUser}`);
+      }
+
+      try {
+        await this.transporter.verify();
+        this.logger.log(`✅ SMTP connection verified successfully with mail server! Real emails will be delivered.`);
+      } catch (verifyErr: any) {
+        this.logger.error(`❌ SMTP Connection verification failed: ${verifyErr.message}`);
+        this.logger.warn(`Note: For Gmail, ensure 2-Factor Authentication is enabled and use a 16-character 'App Password' from https://myaccount.google.com/apppasswords`);
+      }
     } else {
-      this.logger.warn('SMTP credentials not fully configured in .env. Emails will be logged to system audit & console.');
+      try {
+        this.logger.log('No SMTP_USER / SMTP_PASS configured in .env. Provisioning automated Ethereal fallback...');
+        const testAccount = await nodemailer.createTestAccount();
+        this.transporter = nodemailer.createTransport({
+          host: 'smtp.ethereal.email',
+          port: 587,
+          secure: false,
+          auth: {
+            user: testAccount.user,
+            pass: testAccount.pass,
+          },
+        });
+        this.etherealUser = testAccount.user;
+        this.logger.log(`Automated Ethereal fallback initialized (${testAccount.user})`);
+      } catch (err: any) {
+        this.logger.warn(`Could not provision Ethereal SMTP account: ${err.message}. Outbound emails will log to console.`);
+      }
     }
   }
 
@@ -40,19 +86,34 @@ export class EmailService {
     html: string;
     text?: string;
     templateName?: string;
-  }) {
-    const from = this.configService.get<string>('SMTP_FROM') || '"WorkDesk Platform" <notifications@workdesk.internal>';
+  }): Promise<{ success: boolean; previewUrl?: string; error?: string }> {
+    if (!this.transporter && this.initPromise) {
+      await this.initPromise;
+    }
+
+    const host = this.configService.get<string>('SMTP_HOST');
+    const user = this.configService.get<string>('SMTP_USER') || this.etherealUser;
+    const defaultFrom = user ? `"WorkDesk Platform" <${user}>` : '"WorkDesk Platform" <notifications@workdesk.internal>';
+    const from = this.configService.get<string>('SMTP_FROM') || defaultFrom;
 
     try {
+      let previewUrl: string | undefined = undefined;
       if (this.transporter) {
-        await this.transporter.sendMail({
+        const info = await this.transporter.sendMail({
           from,
           to: params.to,
           subject: params.subject,
           html: params.html,
           text: params.text || params.subject,
         });
-        this.logger.log(`Email successfully dispatched via SMTP to ${params.to}`);
+        const url = nodemailer.getTestMessageUrl(info);
+        if (url) {
+          previewUrl = url.toString();
+          this.logger.log(`📬 [LIVE EMAIL PREVIEW URL]: ${previewUrl}`);
+          this.logger.log(`Recipient ${params.to} can view their invitation and accept it at: ${previewUrl}`);
+        } else {
+          this.logger.log(`Email successfully dispatched via SMTP to ${params.to} (Message ID: ${info.messageId})`);
+        }
       } else {
         this.logger.log(`
 ===================== [WORKDESK OUTGOING EMAIL DISPATCH] =====================
@@ -75,7 +136,7 @@ ${params.text || params.subject}
         },
       });
 
-      return { success: true };
+      return { success: true, previewUrl };
     } catch (err: any) {
       this.logger.error(`Failed to dispatch email to ${params.to}: ${err.message}`);
       await this.prisma.emailLog.create({
