@@ -18,7 +18,6 @@ import { AuditPage } from './pages/AuditPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { BacklogPage } from './pages/BacklogPage';
 import { SprintPlanningPage } from './pages/SprintPlanningPage';
-import { KanbanBoardPage } from './pages/KanbanBoardPage';
 import { CalendarPage } from './pages/CalendarPage';
 
 import { ControlTowerPage } from './pages/ControlTowerPage';
@@ -84,8 +83,8 @@ export const App: React.FC = () => {
             <Route path="tasks/:ticketId" element={<TicketDetailView />} />
             <Route path="projects/:projectId/backlog" element={<BacklogPage />} />
             <Route path="projects/:projectId/sprints/:sprintId/planning" element={<SprintPlanningPage />} />
-            <Route path="projects/:projectId/boards" element={<KanbanBoardPage />} />
-            <Route path="projects/:projectId/boards/:boardId" element={<KanbanBoardPage />} />
+            <Route path="projects/:projectId/boards" element={<Navigate to="/tasks" replace />} />
+            <Route path="projects/:projectId/boards/:boardId" element={<Navigate to="/tasks" replace />} />
             <Route path="standup" element={<StandupPage />} />
             <Route path="meetings" element={<MeetingsPage />} />
             <Route path="meetings/:id/workspace" element={<MeetingWorkspacePage />} />

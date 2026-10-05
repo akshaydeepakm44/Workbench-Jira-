@@ -11,7 +11,6 @@ import {
   FileText,
   Settings,
   Shield,
-  Columns,
   ListOrdered,
   CalendarDays,
   Activity,
@@ -50,10 +49,6 @@ export const Sidebar: React.FC = () => {
             <NavLink to="/projects/default/backlog" className={navItemClass}>
               <ListOrdered className="w-4 h-4" />
               <span>Backlog & Sprints</span>
-            </NavLink>
-            <NavLink to="/projects/default/boards" className={navItemClass}>
-              <Columns className="w-4 h-4" />
-              <span>Agile Kanban</span>
             </NavLink>
             <NavLink to="/calendar" className={navItemClass}>
               <CalendarDays className="w-4 h-4 text-indigo-400" />

@@ -16,7 +16,6 @@ import {
   Target,
   Layers,
   X,
-  Columns,
 } from 'lucide-react';
 
 export const BacklogPage: React.FC = () => {
@@ -258,14 +257,6 @@ export const BacklogPage: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          <Link
-            to={`/projects/${activeProjectId}/boards`}
-            className="flex items-center gap-2 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-medium rounded-lg transition-colors border border-slate-700"
-          >
-            <Columns className="w-4 h-4 text-indigo-400" />
-            <span>Open Kanban Board</span>
-          </Link>
-
           {isLeadOrManager && (
             <button
               onClick={() => setIsCreateSprintOpen(true)}
