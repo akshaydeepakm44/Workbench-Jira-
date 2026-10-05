@@ -21,9 +21,8 @@ import { SettingsPage } from './pages/SettingsPage';
 import { BacklogPage } from './pages/BacklogPage';
 import { SprintPlanningPage } from './pages/SprintPlanningPage';
 import { KanbanBoardPage } from './pages/KanbanBoardPage';
-import { WorkloadCapacityPage } from './pages/WorkloadCapacityPage';
-import { TimelinePage } from './pages/TimelinePage';
 import { CalendarPage } from './pages/CalendarPage';
+
 import { ControlTowerPage } from './pages/ControlTowerPage';
 import { ProjectDecisionsPage } from './pages/ProjectDecisionsPage';
 import { AutomationRulesPage } from './pages/AutomationRulesPage';
@@ -94,10 +93,11 @@ export const App: React.FC = () => {
             <Route path="meetings/:id/workspace" element={<MeetingWorkspacePage />} />
             <Route path="team/progress" element={<ProgressPage />} />
             <Route path="reports" element={<ReportsPage />} />
-            <Route path="workload" element={<WorkloadCapacityPage />} />
-            <Route path="timeline" element={<TimelinePage />} />
-            <Route path="projects/:projectId/timeline" element={<TimelinePage />} />
+            <Route path="workload" element={<Navigate to="/dashboard" replace />} />
+            <Route path="timeline" element={<Navigate to="/dashboard" replace />} />
+            <Route path="projects/:projectId/timeline" element={<Navigate to="/dashboard" replace />} />
             <Route path="calendar" element={<CalendarPage />} />
+
             <Route path="control-tower" element={<ControlTowerPage />} />
             <Route path="decisions" element={<ProjectDecisionsPage />} />
             <Route path="automation" element={<AutomationRulesPage />} />

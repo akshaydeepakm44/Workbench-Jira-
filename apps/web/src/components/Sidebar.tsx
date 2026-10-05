@@ -15,11 +15,10 @@ import {
   Layers,
   Columns,
   ListOrdered,
-  GanttChart,
-  Gauge,
   CalendarDays,
   Activity,
 } from 'lucide-react';
+
 
 export const Sidebar: React.FC = () => {
   const { user } = useAuth();
@@ -58,18 +57,11 @@ export const Sidebar: React.FC = () => {
               <Columns className="w-4 h-4" />
               <span>Agile Kanban</span>
             </NavLink>
-            <NavLink to="/timeline" className={navItemClass}>
-              <GanttChart className="w-4 h-4 text-emerald-400" />
-              <span>Timeline / Gantt</span>
-            </NavLink>
-            <NavLink to="/workload" className={navItemClass}>
-              <Gauge className="w-4 h-4 text-amber-400" />
-              <span>Workload & Capacity</span>
-            </NavLink>
             <NavLink to="/calendar" className={navItemClass}>
               <CalendarDays className="w-4 h-4 text-indigo-400" />
               <span>Work Calendar</span>
             </NavLink>
+
             <NavLink to="/standup" className={navItemClass}>
               <Calendar className="w-4 h-4" />
               <span>Daily Stand-up</span>
